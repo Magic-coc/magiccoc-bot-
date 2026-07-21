@@ -10,17 +10,21 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const GUILD_ID = process.env.GUILD_ID;
 const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
 const LOG_CHANNEL_ID = process.env.LOG_CHANNEL_ID;
+const SCHEDULE_CHANNEL_ID = process.env.SCHEDULE_CHANNEL_ID;
 
 const SLOT_ROLES = {
   '4pm': process.env.SLOT_ROLE_4PM,
   '6pm': process.env.SLOT_ROLE_6PM,
-  '8pm': process.env.SLOT_ROLE_8PM,
 };
 
 const SLOT_CHANNELS = {
   '4pm': process.env.SLOT_CHANNEL_4PM,
   '6pm': process.env.SLOT_CHANNEL_6PM,
-  '8pm': process.env.SLOT_CHANNEL_8PM,
+};
+
+const slotCounts = {
+  '4pm': 8,
+  '6pm': 8,
 };
 
 const client = new Client({
@@ -45,6 +49,34 @@ function verifySignature(body, signature, secret) {
   return expectedSignature === signature;
 }
 
+async function updateScheduleMessage(slot) {
+  try {
+    const scheduleChannel = await client.channels.fetch(SCHEDULE_CHANNEL_ID);
+    const messages = await scheduleChannel.messages.fetch({ limit: 10 });
+    const slotMessage = messages.find(m => 
+      m.content.includes(`${slot.toUpperCase()} Match`) && m.author.bot
+    );
+
+    if (slotMessage) {
+      const slotsLeft = slotCounts[slot];
+      if (slotsLeft > 0) {
+        await slotMessage.edit(
+          slotMessage.content.replace(
+            /\d+ slots? left|FULL ❌/,
+            `${slotsLeft} slot${slotsLeft === 1 ? '' : 's'} left`
+          )
+        );
+      } else {
+        await slotMessage.edit(
+          slotMessage.content.replace(/\d+ slots? left|FULL ❌/, 'FULL ❌')
+        );
+      }
+    }
+  } catch (err) {
+    console.error('Error updating schedule message:', err.message);
+  }
+}
+
 app.post('/webhook', async (req, res) => {
   const signature = req.headers['x-razorpay-signature'];
 
@@ -67,7 +99,6 @@ app.post('/webhook', async (req, res) => {
   }
 
   const roleId = SLOT_ROLES[matchSlot];
-  const channelId = SLOT_CHANNELS[matchSlot];
 
   if (!roleId) {
     console.log('Unknown match slot:', matchSlot);
@@ -94,15 +125,21 @@ app.post('/webhook', async (req, res) => {
 
     await member.roles.add(roleId);
 
+    if (slotCounts[matchSlot] > 0) {
+      slotCounts[matchSlot]--;
+    }
+
+    await updateScheduleMessage(matchSlot);
+
     await member.send(
       `✅ Payment confirmed! You are registered for the **${matchSlot.toUpperCase()} Magic Chess match**.\n` +
       `Entry fee paid: ₹${amount}\n` +
-      `Your lobby channel is now visible in the server. See you there!`
+      `Your lobby channel is now visible in the server. See you there! 🎮`
     );
 
     const logChannel = await client.channels.fetch(LOG_CHANNEL_ID);
     await logChannel.send(
-      `✅ Role assigned: **${member.user.username}** → ${matchSlot.toUpperCase()} Registered | ₹${amount} paid`
+      `✅ Role assigned: **${member.user.username}** → ${matchSlot.toUpperCase()} Registered | ₹${amount} paid | Slots left: ${slotCounts[matchSlot]}`
     );
 
     res.send('ok');
@@ -122,12 +159,18 @@ client.on('interactionCreate', async (interaction) => {
     const links = {
       '4pm': process.env.PAYMENT_LINK_4PM,
       '6pm': process.env.PAYMENT_LINK_6PM,
-      '8pm': process.env.PAYMENT_LINK_8PM,
     };
 
     if (!links[slot]) {
       return interaction.reply({
-        content: 'Invalid slot. Choose 4pm, 6pm, or 8pm.',
+        content: 'Invalid slot. Choose 4pm or 6pm.',
+        ephemeral: true
+      });
+    }
+
+    if (slotCounts[slot] <= 0) {
+      return interaction.reply({
+        content: `❌ Sorry the **${slot.toUpperCase()} match** is already full. Watch #match-schedule for new slots.`,
         ephemeral: true
       });
     }
@@ -135,8 +178,9 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.reply({
       content:
         `**${slot.toUpperCase()} Magic Chess Match**\n` +
+        `Slots remaining: **${slotCounts[slot]}**\n` +
         `Pay your entry fee here → ${links[slot]}\n\n` +
-        `⚠️ Important: When paying, enter your **exact Discord username** in the Discord Username field. If it does not match exactly, the bot cannot find you and your role will not be assigned automatically.`,
+        `⚠️ Important: When paying, enter your **exact Discord username** in the Discord Username field. If it does not match exactly the bot cannot find you and your role will not be assigned automatically.`,
       ephemeral: true
     });
   }
