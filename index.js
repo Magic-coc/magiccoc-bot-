@@ -61,7 +61,7 @@ const client = new Client({
   ],
 });
 
-client.once('ready', () => {
+client.once('clientReady', () => {
   console.log('MagicCOC Bot is online as ' + client.user.tag);
 });
 
@@ -95,8 +95,7 @@ client.on('guildMemberAdd', async (member) => {
       'Both - if you play both games'
     );
 
-    const dm2 = await member.createDM();
-    const collector = dm2.createMessageCollector({
+    const collector = dm.createMessageCollector({
       filter: m => m.author.id === member.user.id,
       max: 3,
       time: 86400000,
@@ -109,7 +108,7 @@ client.on('guildMemberAdd', async (member) => {
 
       if (answer === 'magic chess') {
         await member.roles.add(magicChessRole);
-        await dm2.send(
+        await dm.send(
           'You are registered as a Magic Chess Go Go player.\n\n' +
           'Go to match-schedule in the server and use /join to register ' +
           'for upcoming matches. See you in the lobby!'
@@ -119,7 +118,7 @@ client.on('guildMemberAdd', async (member) => {
 
       } else if (answer === 'coc') {
         await member.roles.add(cocRole);
-        await dm2.send(
+        await dm.send(
           'You are registered as a Clash of Clans player.\n\n' +
           'Go to match-schedule in the server and use /join to register ' +
           'for upcoming wars. See you on the battlefield!'
@@ -130,7 +129,7 @@ client.on('guildMemberAdd', async (member) => {
       } else if (answer === 'both') {
         await member.roles.add(magicChessRole);
         await member.roles.add(cocRole);
-        await dm2.send(
+        await dm.send(
           'You are registered as both a Magic Chess Go Go and ' +
           'Clash of Clans player.\n\n' +
           'Go to match-schedule in the server and use /join to register ' +
@@ -140,7 +139,7 @@ client.on('guildMemberAdd', async (member) => {
         collector.stop();
 
       } else {
-        await dm2.send(
+        await dm.send(
           'Please reply with exactly one of these:\n\n' +
           'Magic Chess - for Magic Chess Go Go\n' +
           'CoC - for Clash of Clans\n' +
@@ -151,7 +150,7 @@ client.on('guildMemberAdd', async (member) => {
 
     collector.on('end', async () => {
       if (!assigned) {
-        await dm2.send(
+        await dm.send(
           'You did not reply in time. DM an admin in the server ' +
           'to assign your game role.'
         ).catch(() => {});
