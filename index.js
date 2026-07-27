@@ -62,12 +62,10 @@ const client = new Client({
 });
 
 client.once('ready', () => {
-  console.log(`MagicCOC Bot is online as ${client.user.tag}`);
+  console.log('MagicCOC Bot is online as ' + client.user.tag);
 });
 
 client.login(BOT_TOKEN);
-
-// ─── New member welcome DM ───────────────────────────────────────────────────
 
 client.on('guildMemberAdd', async (member) => {
   try {
@@ -81,26 +79,25 @@ client.on('guildMemberAdd', async (member) => {
     );
 
     if (!magicChessRole || !cocRole) {
-      console.error('Magic Chess Player or CoC Player role not found');
+      console.log('Magic Chess Player or CoC Player role not found');
       return;
     }
 
     const dm = await member.createDM();
 
     await dm.send(
-      `👋 Welcome to **Magic COC**, ${member.user.username}!\n\n` +
-      `We organize tournaments for **Magic Chess Go Go** and **Clash of Clans** ` +
-      `with real money prizes. 🏆\n\n` +
-      `Which game do you play? Reply with one of these options:\n\n` +
-      `**Magic Chess** — for Magic Chess Go Go\n` +
-      `**CoC** — for Clash of Clans\n` +
-      `**Both** — if you play both games\n`
+      'Welcome to Magic COC ' + member.user.username + '\n\n' +
+      'We organize tournaments for Magic Chess Go Go and Clash of Clans ' +
+      'with real money prizes.\n\n' +
+      'Which game do you play? Reply with one of these:\n\n' +
+      'Magic Chess - for Magic Chess Go Go\n' +
+      'CoC - for Clash of Clans\n' +
+      'Both - if you play both games'
     );
 
-    const filter = m => m.author.id === member.user.id;
-
-    const collector = dm.createMessageCollector({
-      filter,
+    const dm2 = await member.createDM();
+    const collector = dm2.createMessageCollector({
+      filter: m => m.author.id === member.user.id,
       max: 3,
       time: 86400000,
     });
@@ -112,20 +109,20 @@ client.on('guildMemberAdd', async (member) => {
 
       if (answer === 'magic chess') {
         await member.roles.add(magicChessRole);
-        await dm.send(
-          `✅ Got it! You are registered as a **Magic Chess Go Go** player.\n\n` +
-          `Go to **#match-schedule** in the server and use **/join** to register ` +
-          `for upcoming matches. See you in the lobby! 🎮`
+        await dm2.send(
+          'You are registered as a Magic Chess Go Go player.\n\n' +
+          'Go to match-schedule in the server and use /join to register ' +
+          'for upcoming matches. See you in the lobby!'
         );
         assigned = true;
         collector.stop();
 
       } else if (answer === 'coc') {
         await member.roles.add(cocRole);
-        await dm.send(
-          `✅ Got it! You are registered as a **Clash of Clans** player.\n\n` +
-          `Go to **#match-schedule** in the server and use **/join** to register ` +
-          `for upcoming wars. See you on the battlefield! ⚔️`
+        await dm2.send(
+          'You are registered as a Clash of Clans player.\n\n' +
+          'Go to match-schedule in the server and use /join to register ' +
+          'for upcoming wars. See you on the battlefield!'
         );
         assigned = true;
         collector.stop();
@@ -133,40 +130,38 @@ client.on('guildMemberAdd', async (member) => {
       } else if (answer === 'both') {
         await member.roles.add(magicChessRole);
         await member.roles.add(cocRole);
-        await dm.send(
-          `✅ Got it! You are registered as both a **Magic Chess Go Go** and ` +
-          `**Clash of Clans** player.\n\n` +
-          `Go to **#match-schedule** in the server and use **/join** to register ` +
-          `for upcoming matches and wars. See you there! 🏆`
+        await dm2.send(
+          'You are registered as both a Magic Chess Go Go and ' +
+          'Clash of Clans player.\n\n' +
+          'Go to match-schedule in the server and use /join to register ' +
+          'for upcoming matches and wars. See you there!'
         );
         assigned = true;
         collector.stop();
 
       } else {
-        await dm.send(
-          `❌ Please reply with exactly one of these:\n\n` +
-          `**Magic Chess** — for Magic Chess Go Go\n` +
-          `**CoC** — for Clash of Clans\n` +
-          `**Both** — if you play both games`
+        await dm2.send(
+          'Please reply with exactly one of these:\n\n' +
+          'Magic Chess - for Magic Chess Go Go\n' +
+          'CoC - for Clash of Clans\n' +
+          'Both - if you play both games'
         );
       }
     });
 
     collector.on('end', async () => {
       if (!assigned) {
-        await dm.send(
-          `You did not reply in time. No worries — just DM an admin in the ` +
-          `server and they will assign your game role for you. 🎮`
+        await dm2.send(
+          'You did not reply in time. DM an admin in the server ' +
+          'to assign your game role.'
         ).catch(() => {});
       }
     });
 
   } catch (err) {
-    console.error('Error in guildMemberAdd:', err.message);
+    console.log('Error in guildMemberAdd: ' + err.message);
   }
 });
-
-// ─── Signature verification ──────────────────────────────────────────────────
 
 function verifySignature(body, signature, secret) {
   const expectedSignature = crypto
@@ -176,8 +171,6 @@ function verifySignature(body, signature, secret) {
   return expectedSignature === signature;
 }
 
-// ─── Slot counter ────────────────────────────────────────────────────────────
-
 async function updateOrCreateSlotCounter(slot) {
   try {
     const scheduleChannel = await client.channels.fetch(SCHEDULE_CHANNEL_ID);
@@ -185,12 +178,8 @@ async function updateOrCreateSlotCounter(slot) {
     const label = SLOT_LABELS[slot];
 
     const message = slotsLeft > 0
-      ? `🎮 **${label}**\n` +
-        `✅ Slots remaining: **${slotsLeft}**\n` +
-        `Type \`/join\` in this channel to register.`
-      : `🎮 **${label}**\n` +
-        `❌ **FULL** — No slots remaining.\n` +
-        `Watch #announcements for the next match.`;
+      ? 'Game: ' + label + '\nSlots remaining: ' + slotsLeft + '\nType /join in this channel to register.'
+      : 'Game: ' + label + '\nFULL - No slots remaining. Watch announcements for the next match.';
 
     if (slotCounterMessageIds[slot]) {
       try {
@@ -198,7 +187,7 @@ async function updateOrCreateSlotCounter(slot) {
           slotCounterMessageIds[slot]
         );
         await existing.edit(message);
-      } catch {
+      } catch (e) {
         const newMsg = await scheduleChannel.send(message);
         slotCounterMessageIds[slot] = newMsg.id;
       }
@@ -207,22 +196,18 @@ async function updateOrCreateSlotCounter(slot) {
       slotCounterMessageIds[slot] = newMsg.id;
     }
   } catch (err) {
-    console.error('Error updating slot counter:', err.message);
+    console.log('Error updating slot counter: ' + err.message);
   }
 }
-
-// ─── Log to bot-logs ─────────────────────────────────────────────────────────
 
 async function logToChannel(message) {
   try {
     const logChannel = await client.channels.fetch(LOG_CHANNEL_ID);
     await logChannel.send(message);
   } catch (err) {
-    console.error('Error sending to log channel:', err.message);
+    console.log('Error sending to log channel: ' + err.message);
   }
 }
-
-// ─── Razorpay webhook ────────────────────────────────────────────────────────
 
 app.post('/webhook', async (req, res) => {
   const signature = req.headers['x-razorpay-signature'];
@@ -247,9 +232,9 @@ app.post('/webhook', async (req, res) => {
 
   if (!discordUsername || !matchSlot) {
     await logToChannel(
-      `⚠️ Payment received but missing details.\n` +
-      `Amount: ₹${amount} | Slot: ${matchSlot || 'unknown'} | ` +
-      `Discord: ${discordUsername || 'unknown'}`
+      'Payment received but missing details. Amount: ' + amount +
+      ' Slot: ' + (matchSlot || 'unknown') +
+      ' Discord: ' + (discordUsername || 'unknown')
     );
     return res.send('ok');
   }
@@ -259,8 +244,9 @@ app.post('/webhook', async (req, res) => {
 
   if (!roleId) {
     await logToChannel(
-      `⚠️ Unknown match slot: **${matchSlot}** | ` +
-      `Amount: ₹${amount} | Discord: ${discordUsername}`
+      'Unknown match slot: ' + matchSlot +
+      ' Amount: ' + amount +
+      ' Discord: ' + discordUsername
     );
     return res.send('ok');
   }
@@ -275,13 +261,13 @@ app.post('/webhook', async (req, res) => {
 
     if (!member) {
       await logToChannel(
-        `⚠️ Payment received but Discord user not found.\n` +
-        `Discord username typed: **${discordUsername}**\n` +
-        `Slot: **${label}** | Amount: ₹${amount}\n` +
-        `In-Game Name: ${inGameName || 'not provided'}\n` +
-        `In-Game ID: ${inGameId || 'not provided'}\n` +
-        `Group Details: ${inGameDetails || 'solo player'}\n` +
-        `⚡ Please assign the role manually.`
+        'Payment received but Discord user not found.\n' +
+        'Discord username typed: ' + discordUsername + '\n' +
+        'Slot: ' + label + ' Amount: ' + amount + '\n' +
+        'In-Game Name: ' + (inGameName || 'not provided') + '\n' +
+        'In-Game ID: ' + (inGameId || 'not provided') + '\n' +
+        'Group Details: ' + (inGameDetails || 'solo player') + '\n' +
+        'Please assign the role manually.'
       );
       return res.send('ok');
     }
@@ -295,34 +281,32 @@ app.post('/webhook', async (req, res) => {
     await updateOrCreateSlotCounter(matchSlot);
 
     await member.send(
-      `✅ Payment confirmed! You are registered for **${label}**.\n` +
-      `Amount paid: ₹${amount}\n\n` +
-      `Your private lobby channel is now visible in the server.\n` +
-      `Please be online and ready 5 minutes before match time. 🎮`
+      'Payment confirmed! You are registered for ' + label + '.\n' +
+      'Amount paid: ' + amount + '\n\n' +
+      'Your private lobby channel is now visible in the server.\n' +
+      'Please be online and ready 5 minutes before match time.'
     );
 
     await logToChannel(
-      `✅ Registration confirmed\n` +
-      `Discord: **${member.user.username}**\n` +
-      `Slot: **${label}** | Amount: ₹${amount}\n` +
-      `In-Game Name: **${inGameName || 'not provided'}**\n` +
-      `In-Game ID: **${inGameId || 'not provided'}**\n` +
-      `Group Details: **${inGameDetails || 'solo player'}**\n` +
-      `Slots remaining: **${slotCounts[matchSlot]}**`
+      'Registration confirmed\n' +
+      'Discord: ' + member.user.username + '\n' +
+      'Slot: ' + label + ' Amount: ' + amount + '\n' +
+      'In-Game Name: ' + (inGameName || 'not provided') + '\n' +
+      'In-Game ID: ' + (inGameId || 'not provided') + '\n' +
+      'Group Details: ' + (inGameDetails || 'solo player') + '\n' +
+      'Slots remaining: ' + slotCounts[matchSlot]
     );
 
     res.send('ok');
 
   } catch (err) {
-    console.error('Error processing payment:', err.message);
+    console.log('Error processing payment: ' + err.message);
     await logToChannel(
-      `❌ Error processing payment for **${discordUsername}** — ${err.message}`
+      'Error processing payment for ' + discordUsername + ' - ' + err.message
     );
     res.send('ok');
   }
 });
-
-// ─── Slash commands ──────────────────────────────────────────────────────────
 
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
@@ -341,50 +325,42 @@ client.on('interactionCreate', async (interaction) => {
 
     if (!links[slot] || links[slot] === 'placeholder') {
       return interaction.reply({
-        content:
-          `⏳ **${label}** registration is not open yet.\n` +
-          `Watch #announcements for updates. 🎮`,
+        content: label + ' registration is not open yet. Watch announcements for updates.',
         ephemeral: true,
       });
     }
 
     if (slotCounts[slot] <= 0) {
       return interaction.reply({
-        content:
-          `❌ **${label}** is full. No slots remaining.\n` +
-          `Watch #announcements for the next match. 🎮`,
+        content: label + ' is full. No slots remaining. Watch announcements for the next match.',
         ephemeral: true,
       });
     }
 
     await interaction.reply({
       content:
-        `🎮 **${label}**\n` +
-        `Slots remaining: **${slotCounts[slot]}**\n\n` +
-        `Pay your entry fee here:\n` +
-        `${links[slot]}\n\n` +
-        `⚠️ **Fill these correctly when paying:**\n` +
-        `• Discord Username — your exact Discord username\n` +
-        `• In-Game Name — your name as it appears in the game\n` +
-        `• In-Game ID — your unique player ID\n` +
-        `• In-Game Details — if registering as a group, write your ` +
-        `teammates IGN and ID here. Solo players leave this blank.\n\n` +
-        `Your lobby channel unlocks automatically within 30 seconds of payment. 🏆`,
+        label + '\n' +
+        'Slots remaining: ' + slotCounts[slot] + '\n\n' +
+        'Pay your entry fee here:\n' +
+        links[slot] + '\n\n' +
+        'Fill these correctly when paying:\n' +
+        'Discord Username - your exact Discord username\n' +
+        'In-Game Name - your name as it appears in the game\n' +
+        'In-Game ID - your unique player ID\n' +
+        'In-Game Details - if registering as a group write your teammates IGN and ID here. Solo players leave this blank.\n\n' +
+        'Your lobby channel unlocks automatically within 30 seconds of payment.',
       ephemeral: true,
     });
   }
 });
 
-// ─── Admin commands ──────────────────────────────────────────────────────────
-
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
   const member = message.member;
-  const isAdmin = member && member.roles.cache.some(
-    r => r.name === 'Admin'
-  );
+  if (!member) return;
 
+  const isAdmin = member.roles.cache.some(r => r.name === 'Admin');
   if (!isAdmin) return;
 
   if (message.content === '!resetslots') {
@@ -398,7 +374,7 @@ client.on('messageCreate', async (message) => {
       slotCounterMessageIds[key] = null;
     });
 
-    await message.reply('✅ All slot counts reset successfully.');
+    await message.reply('All slot counts reset successfully.');
   }
 
   if (message.content.startsWith('!resetslot ')) {
@@ -413,18 +389,14 @@ client.on('messageCreate', async (message) => {
 
     if (!defaultCounts[slot]) {
       return message.reply(
-        '❌ Unknown slot. Use: `4pm` `6pm` `mc-free` `coc-war` `coc-tournament`'
+        'Unknown slot. Use: 4pm 6pm mc-free coc-war coc-tournament'
       );
     }
 
     slotCounts[slot] = defaultCounts[slot];
     slotCounterMessageIds[slot] = null;
-    await message.reply(
-      `✅ Slot **${slot}** reset to **${defaultCounts[slot]}** successfully.`
-    );
+    await message.reply('Slot ' + slot + ' reset to ' + defaultCounts[slot] + ' successfully.');
   }
 });
-
-// ─── Server ──────────────────────────────────────────────────────────────────
 
 app.listen(3000, () => console.log('Webhook server running on port 3000'));
