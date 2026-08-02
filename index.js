@@ -7,49 +7,82 @@ app.use(express.json());
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const GUILD_ID = process.env.GUILD_ID;
-const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
+const CASHFREE_WEBHOOK_SECRET = process.env.CASHFREE_WEBHOOK_SECRET;
 const LOG_CHANNEL_ID = process.env.LOG_CHANNEL_ID;
 const SCHEDULE_CHANNEL_ID = process.env.SCHEDULE_CHANNEL_ID;
 
 const SLOT_ROLES = {
-  '4pm': process.env.SLOT_ROLE_4PM,
-  '6pm': process.env.SLOT_ROLE_6PM,
-  'mc-free': process.env.MC_FREE_TOURNAMENT_ROLE,
-  'coc-war': process.env.COC_WAR_A_ROLE,
-  'coc-tournament': process.env.COC_TOURNAMENT_ROLE,
+  'ml-a': process.env.SLOT_ROLE_ML_A,
+  'ml-b': process.env.SLOT_ROLE_ML_B,
+  'ml-free': process.env.SLOT_ROLE_ML_FREE,
+  'cr-a': process.env.SLOT_ROLE_CR_A,
+  'cr-b': process.env.SLOT_ROLE_CR_B,
+  'cr-free': process.env.SLOT_ROLE_CR_FREE,
+  'mc-a': process.env.SLOT_ROLE_MC_A,
+  'mc-b': process.env.SLOT_ROLE_MC_B,
+  'mc-free': process.env.SLOT_ROLE_MC_FREE,
+  'coc-war': process.env.SLOT_ROLE_COC_WAR,
+  'coc-free': process.env.SLOT_ROLE_COC_FREE,
 };
 
 const SLOT_CHANNELS = {
-  '4pm': process.env.SLOT_CHANNEL_4PM,
-  '6pm': process.env.SLOT_CHANNEL_6PM,
-  'mc-free': process.env.MC_FREE_TOURNAMENT_CHANNEL,
-  'coc-war': process.env.COC_WAR_A_CHANNEL,
-  'coc-tournament': process.env.COC_TOURNAMENT_CHANNEL,
+  'ml-a': process.env.SLOT_CHANNEL_ML_A,
+  'ml-b': process.env.SLOT_CHANNEL_ML_B,
+  'ml-free': process.env.SLOT_CHANNEL_ML_FREE,
+  'cr-a': process.env.SLOT_CHANNEL_CR_A,
+  'cr-b': process.env.SLOT_CHANNEL_CR_B,
+  'cr-free': process.env.SLOT_CHANNEL_CR_FREE,
+  'mc-a': process.env.SLOT_CHANNEL_MC_A,
+  'mc-b': process.env.SLOT_CHANNEL_MC_B,
+  'mc-free': process.env.SLOT_CHANNEL_MC_FREE,
+  'coc-war': process.env.SLOT_CHANNEL_COC_WAR,
+  'coc-free': process.env.SLOT_CHANNEL_COC_FREE,
 };
 
 const SLOT_LABELS = {
-  '4pm': 'Magic Chess 4PM Match',
-  '6pm': 'Magic Chess 6PM Match',
-  'mc-free': 'Magic Chess Free Tournament',
+  'ml-a': 'Mobile Legends Paid Match A',
+  'ml-b': 'Mobile Legends Paid Match B',
+  'ml-free': 'Mobile Legends Free Contest',
+  'cr-a': 'Clash Royale Paid Match A',
+  'cr-b': 'Clash Royale Paid Match B',
+  'cr-free': 'Clash Royale Free Contest',
+  'mc-a': 'Magic Chess Paid Match A',
+  'mc-b': 'Magic Chess Paid Match B',
+  'mc-free': 'Magic Chess Free Contest',
   'coc-war': 'CoC Weekly War',
-  'coc-tournament': 'CoC Tournament',
+  'coc-free': 'CoC Free Tournament',
+};
+
+const FREE_SLOTS = ['ml-free', 'cr-free', 'mc-free', 'coc-free'];
+
+const PAID_LINKS = {
+  'ml-a': process.env.PAYMENT_LINK_ML_A,
+  'ml-b': process.env.PAYMENT_LINK_ML_B,
+  'cr-a': process.env.PAYMENT_LINK_CR_A,
+  'cr-b': process.env.PAYMENT_LINK_CR_B,
+  'coc-war': process.env.PAYMENT_LINK_COC_WAR,
 };
 
 const slotCounts = {
-  '4pm': 8,
-  '6pm': 8,
+  'ml-a': 8,
+  'ml-b': 8,
+  'ml-free': 20,
+  'cr-a': 8,
+  'cr-b': 8,
+  'cr-free': 16,
+  'mc-a': 8,
+  'mc-b': 8,
   'mc-free': 16,
-  'coc-war': 20,
-  'coc-tournament': 20,
+  'coc-war': 40,
+  'coc-free': 128,
 };
 
-const slotCounterMessageIds = {
-  '4pm': null,
-  '6pm': null,
-  'mc-free': null,
-  'coc-war': null,
-  'coc-tournament': null,
-};
+const slotCounterMessageIds = {};
+Object.keys(slotCounts).forEach(key => {
+  slotCounterMessageIds[key] = null;
+});
+
+const pendingFreeRegistrations = {};
 
 const client = new Client({
   intents: [
@@ -62,7 +95,7 @@ const client = new Client({
 });
 
 client.once('clientReady', () => {
-  console.log('MagicCOC Bot is online as ' + client.user.tag);
+  console.log('Tournament Hub Bot is online as ' + client.user.tag);
 });
 
 client.login(BOT_TOKEN);
@@ -71,28 +104,28 @@ client.on('guildMemberAdd', async (member) => {
   try {
     const guild = member.guild;
 
-    const magicChessRole = guild.roles.cache.find(
-      r => r.name === 'Magic Chess Player'
-    );
-    const cocRole = guild.roles.cache.find(
-      r => r.name === 'CoC Player'
-    );
+    const mlRole = guild.roles.cache.find(r => r.name === 'Mobile Legend Player');
+    const crRole = guild.roles.cache.find(r => r.name === 'Clash Royale Player');
+    const mcRole = guild.roles.cache.find(r => r.name === 'Magic Chess Player');
+    const cocRole = guild.roles.cache.find(r => r.name === 'CoC Player');
 
-    if (!magicChessRole || !cocRole) {
-      console.log('Magic Chess Player or CoC Player role not found');
+    if (!mlRole || !crRole || !mcRole || !cocRole) {
+      console.log('One or more interest roles not found');
       return;
     }
 
     const dm = await member.createDM();
 
     await dm.send(
-      'Welcome to Magic COC ' + member.user.username + '\n\n' +
-      'We organize tournaments for Magic Chess Go Go and Clash of Clans ' +
-      'with real money prizes.\n\n' +
-      'Which game do you play? Reply with one of these:\n\n' +
-      'Magic Chess - for Magic Chess Go Go\n' +
-      'CoC - for Clash of Clans\n' +
-      'Both - if you play both games'
+      'Welcome to Tournament Hub ' + member.user.username + '\n\n' +
+      'We organize skill-based tournaments for Mobile Legends, ' +
+      'Clash Royale, Magic Chess and Clash of Clans with real cash prizes.\n\n' +
+      'Which games do you play? Reply with one of these:\n\n' +
+      'ML - Mobile Legends Bang Bang\n' +
+      'CR - Clash Royale\n' +
+      'MC - Magic Chess Go Go\n' +
+      'COC - Clash of Clans\n' +
+      'ALL - I play all games'
     );
 
     const collector = dm.createMessageCollector({
@@ -104,46 +137,29 @@ client.on('guildMemberAdd', async (member) => {
     let assigned = false;
 
     collector.on('collect', async (response) => {
-      const answer = response.content.trim().toLowerCase();
+      const answer = response.content.trim().toUpperCase();
 
-      if (answer === 'magic chess') {
-        await member.roles.add(magicChessRole);
+      if (['ML', 'CR', 'MC', 'COC', 'ALL'].includes(answer)) {
+        if (answer === 'ML' || answer === 'ALL') await member.roles.add(mlRole);
+        if (answer === 'CR' || answer === 'ALL') await member.roles.add(crRole);
+        if (answer === 'MC' || answer === 'ALL') await member.roles.add(mcRole);
+        if (answer === 'COC' || answer === 'ALL') await member.roles.add(cocRole);
+
         await dm.send(
-          'You are registered as a Magic Chess Go Go player.\n\n' +
-          'Go to match-schedule in the server and use /join to register ' +
-          'for upcoming matches. See you in the lobby!'
+          'You are all set! Your game role has been assigned.\n\n' +
+          'Go to match-schedule in the server and type /join ' +
+          'to register for upcoming matches and tournaments. See you there!'
         );
         assigned = true;
         collector.stop();
-
-      } else if (answer === 'coc') {
-        await member.roles.add(cocRole);
-        await dm.send(
-          'You are registered as a Clash of Clans player.\n\n' +
-          'Go to match-schedule in the server and use /join to register ' +
-          'for upcoming wars. See you on the battlefield!'
-        );
-        assigned = true;
-        collector.stop();
-
-      } else if (answer === 'both') {
-        await member.roles.add(magicChessRole);
-        await member.roles.add(cocRole);
-        await dm.send(
-          'You are registered as both a Magic Chess Go Go and ' +
-          'Clash of Clans player.\n\n' +
-          'Go to match-schedule in the server and use /join to register ' +
-          'for upcoming matches and wars. See you there!'
-        );
-        assigned = true;
-        collector.stop();
-
       } else {
         await dm.send(
-          'Please reply with exactly one of these:\n\n' +
-          'Magic Chess - for Magic Chess Go Go\n' +
-          'CoC - for Clash of Clans\n' +
-          'Both - if you play both games'
+          'Please reply with one of these exactly:\n\n' +
+          'ML - Mobile Legends Bang Bang\n' +
+          'CR - Clash Royale\n' +
+          'MC - Magic Chess Go Go\n' +
+          'COC - Clash of Clans\n' +
+          'ALL - I play all games'
         );
       }
     });
@@ -162,11 +178,11 @@ client.on('guildMemberAdd', async (member) => {
   }
 });
 
-function verifySignature(body, signature, secret) {
+function verifyCashfreeSignature(body, signature, secret) {
   const expectedSignature = crypto
     .createHmac('sha256', secret)
     .update(JSON.stringify(body))
-    .digest('hex');
+    .digest('base64');
   return expectedSignature === signature;
 }
 
@@ -175,10 +191,14 @@ async function updateOrCreateSlotCounter(slot) {
     const scheduleChannel = await client.channels.fetch(SCHEDULE_CHANNEL_ID);
     const slotsLeft = slotCounts[slot];
     const label = SLOT_LABELS[slot];
+    const isFree = FREE_SLOTS.includes(slot);
 
     const message = slotsLeft > 0
-      ? 'Game: ' + label + '\nSlots remaining: ' + slotsLeft + '\nType /join in this channel to register.'
-      : 'Game: ' + label + '\nFULL - No slots remaining. Watch announcements for the next match.';
+      ? label + ' — ' + (isFree ? 'FREE' : 'Paid') + '\n' +
+        'Slots remaining: ' + slotsLeft + '\n' +
+        'Type /join in this channel to register.'
+      : label + '\n' +
+        'FULL — No slots remaining. Watch announcements for next match.';
 
     if (slotCounterMessageIds[slot]) {
       try {
@@ -208,45 +228,75 @@ async function logToChannel(message) {
   }
 }
 
-app.post('/webhook', async (req, res) => {
-  const signature = req.headers['x-razorpay-signature'];
+async function assignRole(member, slot, inGameName, inGameId, inGameDetails, amount) {
+  try {
+    const roleId = SLOT_ROLES[slot];
+    const label = SLOT_LABELS[slot];
 
-  if (!verifySignature(req.body, signature, RAZORPAY_WEBHOOK_SECRET)) {
-    console.log('Invalid signature - ignoring');
+    await member.roles.add(roleId);
+
+    if (slotCounts[slot] > 0) {
+      slotCounts[slot]--;
+    }
+
+    await updateOrCreateSlotCounter(slot);
+
+    await member.send(
+      'You are registered for ' + label + '.\n' +
+      (amount ? 'Amount paid: ' + amount + '\n\n' : '\n') +
+      'Your private lobby channel is now visible in the server.\n' +
+      'Please be online and ready 5 minutes before match time.'
+    );
+
+    await logToChannel(
+      'Registration confirmed\n' +
+      'Discord: ' + member.user.username + '\n' +
+      'Slot: ' + label + (amount ? ' | Amount: ' + amount : ' | FREE') + '\n' +
+      'In-Game Name: ' + (inGameName || 'not provided') + '\n' +
+      'In-Game ID: ' + (inGameId || 'not provided') + '\n' +
+      'Group Details: ' + (inGameDetails || 'solo player') + '\n' +
+      'Slots remaining: ' + slotCounts[slot]
+    );
+
+  } catch (err) {
+    console.log('Error assigning role: ' + err.message);
+    await logToChannel('Error assigning role for ' + member.user.username + ' - ' + err.message);
+  }
+}
+
+app.post('/webhook', async (req, res) => {
+  const signature = req.headers['x-cashfree-signature'];
+
+  if (!verifyCashfreeSignature(req.body, signature, CASHFREE_WEBHOOK_SECRET)) {
+    console.log('Invalid Cashfree signature - ignoring');
     return res.status(400).send('Invalid signature');
   }
 
-  const event = req.body.event;
-  if (event !== 'payment_link.paid') return res.send('ok');
+  const event = req.body.type;
+  if (event !== 'PAYMENT_SUCCESS') return res.send('ok');
 
-  const payment = req.body.payload?.payment_link?.entity;
-  const notes = payment?.notes;
+  const payment = req.body.data;
+  const notes = payment?.customer_details?.customer_note || '';
 
-  const discordUsername = notes?.discord_username?.toLowerCase().trim();
-  const matchSlot = notes?.match_slot?.toLowerCase().trim();
-  const inGameName = notes?.in_game_name?.trim();
-  const inGameId = notes?.in_game_id?.trim();
-  const inGameDetails = notes?.in_game_details?.trim();
-  const amount = payment?.amount / 100;
+  const parts = notes.split('|').map(p => p.trim());
+  const discordUsername = parts[0]?.toLowerCase();
+  const matchSlot = parts[1]?.toLowerCase();
+  const inGameName = parts[2];
+  const inGameId = parts[3];
+  const inGameDetails = parts[4];
+  const amount = payment?.order_amount;
 
   if (!discordUsername || !matchSlot) {
     await logToChannel(
-      'Payment received but missing details. Amount: ' + amount +
-      ' Slot: ' + (matchSlot || 'unknown') +
-      ' Discord: ' + (discordUsername || 'unknown')
+      'Payment received but missing details.\n' +
+      'Amount: ' + amount + ' | Notes: ' + notes
     );
     return res.send('ok');
   }
 
   const roleId = SLOT_ROLES[matchSlot];
-  const label = SLOT_LABELS[matchSlot];
-
   if (!roleId) {
-    await logToChannel(
-      'Unknown match slot: ' + matchSlot +
-      ' Amount: ' + amount +
-      ' Discord: ' + discordUsername
-    );
+    await logToChannel('Unknown match slot: ' + matchSlot + ' | Amount: ' + amount);
     return res.send('ok');
   }
 
@@ -261,48 +311,21 @@ app.post('/webhook', async (req, res) => {
     if (!member) {
       await logToChannel(
         'Payment received but Discord user not found.\n' +
-        'Discord username typed: ' + discordUsername + '\n' +
-        'Slot: ' + label + ' Amount: ' + amount + '\n' +
+        'Discord username: ' + discordUsername + '\n' +
+        'Slot: ' + SLOT_LABELS[matchSlot] + ' | Amount: ' + amount + '\n' +
         'In-Game Name: ' + (inGameName || 'not provided') + '\n' +
         'In-Game ID: ' + (inGameId || 'not provided') + '\n' +
-        'Group Details: ' + (inGameDetails || 'solo player') + '\n' +
-        'Please assign the role manually.'
+        'Please assign role manually.'
       );
       return res.send('ok');
     }
 
-    await member.roles.add(roleId);
-
-    if (slotCounts[matchSlot] > 0) {
-      slotCounts[matchSlot]--;
-    }
-
-    await updateOrCreateSlotCounter(matchSlot);
-
-    await member.send(
-      'Payment confirmed! You are registered for ' + label + '.\n' +
-      'Amount paid: ' + amount + '\n\n' +
-      'Your private lobby channel is now visible in the server.\n' +
-      'Please be online and ready 5 minutes before match time.'
-    );
-
-    await logToChannel(
-      'Registration confirmed\n' +
-      'Discord: ' + member.user.username + '\n' +
-      'Slot: ' + label + ' Amount: ' + amount + '\n' +
-      'In-Game Name: ' + (inGameName || 'not provided') + '\n' +
-      'In-Game ID: ' + (inGameId || 'not provided') + '\n' +
-      'Group Details: ' + (inGameDetails || 'solo player') + '\n' +
-      'Slots remaining: ' + slotCounts[matchSlot]
-    );
-
+    await assignRole(member, matchSlot, inGameName, inGameId, inGameDetails, amount);
     res.send('ok');
 
   } catch (err) {
     console.log('Error processing payment: ' + err.message);
-    await logToChannel(
-      'Error processing payment for ' + discordUsername + ' - ' + err.message
-    );
+    await logToChannel('Error processing payment - ' + err.message);
     res.send('ok');
   }
 });
@@ -313,48 +336,128 @@ client.on('interactionCreate', async (interaction) => {
   if (interaction.commandName === 'join') {
     const slot = interaction.options.getString('slot');
     const label = SLOT_LABELS[slot];
-
-    const links = {
-      '4pm': process.env.PAYMENT_LINK_4PM,
-      '6pm': process.env.PAYMENT_LINK_6PM,
-      'mc-free': process.env.PAYMENT_LINK_MC_FREE,
-      'coc-war': process.env.PAYMENT_LINK_COC_WAR,
-      'coc-tournament': process.env.PAYMENT_LINK_COC_TOURNAMENT,
-    };
-
-    if (!links[slot] || links[slot] === 'placeholder') {
-      return interaction.reply({
-        content: label + ' registration is not open yet. Watch announcements for updates.',
-        ephemeral: true,
-      });
-    }
+    const isFree = FREE_SLOTS.includes(slot);
 
     if (slotCounts[slot] <= 0) {
       return interaction.reply({
-        content: label + ' is full. No slots remaining. Watch announcements for the next match.',
+        content: label + ' is full. No slots remaining. Watch announcements for next match.',
         ephemeral: true,
       });
     }
 
-    await interaction.reply({
-      content:
-        label + '\n' +
-        'Slots remaining: ' + slotCounts[slot] + '\n\n' +
-        'Pay your entry fee here:\n' +
-        links[slot] + '\n\n' +
-        'Fill these correctly when paying:\n' +
-        'Discord Username - your exact Discord username\n' +
-        'In-Game Name - your name as it appears in the game\n' +
-        'In-Game ID - your unique player ID\n' +
-        'In-Game Details - if registering as a group write your teammates IGN and ID here. Solo players leave this blank.\n\n' +
-        'Your lobby channel unlocks automatically within 30 seconds of payment.',
-      ephemeral: true,
-    });
+    if (isFree) {
+      await interaction.reply({
+        content:
+          label + ' — FREE\n' +
+          'Slots remaining: ' + slotCounts[slot] + '\n\n' +
+          'Check your DMs — the bot will ask for your details to complete registration.',
+        ephemeral: true,
+      });
+
+      try {
+        const dm = await interaction.user.createDM();
+
+        await dm.send(
+          'Registering you for ' + label + '\n\n' +
+          'Please reply with your details in this exact format:\n\n' +
+          'IGN | Player ID | Group Details\n\n' +
+          'Example for solo player:\n' +
+          'Lavkush | #ABC123 | solo\n\n' +
+          'Example for group:\n' +
+          'Lavkush | #ABC123 | teammate1 #XYZ | teammate2 #DEF\n\n' +
+          'Reply within 5 minutes or your slot will not be confirmed.'
+        );
+
+        pendingFreeRegistrations[interaction.user.id] = {
+          slot: slot,
+          timestamp: Date.now(),
+        };
+
+      } catch (err) {
+        console.log('Error sending free registration DM: ' + err.message);
+      }
+
+    } else {
+      const link = PAID_LINKS[slot];
+
+      if (!link || link === 'placeholder') {
+        return interaction.reply({
+          content: label + ' registration is not open yet. Watch announcements for updates.',
+          ephemeral: true,
+        });
+      }
+
+      await interaction.reply({
+        content:
+          label + '\n' +
+          'Slots remaining: ' + slotCounts[slot] + '\n\n' +
+          'Pay your entry fee here:\n' +
+          link + '\n\n' +
+          'Fill these correctly when paying:\n' +
+          'Discord Username - your exact Discord username\n' +
+          'In-Game Name - your name as it appears in game\n' +
+          'In-Game ID - your unique player ID\n' +
+          'Group Details - teammates IGN and ID if registering as group. Leave blank if solo.\n\n' +
+          'Your lobby channel unlocks automatically within 30 seconds of payment.',
+        ephemeral: true,
+      });
+    }
   }
 });
 
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
+
+  if (message.guild === null) {
+    const userId = message.author.id;
+    const pending = pendingFreeRegistrations[userId];
+
+    if (pending) {
+      const elapsed = Date.now() - pending.timestamp;
+      if (elapsed > 300000) {
+        delete pendingFreeRegistrations[userId];
+        await message.reply('Registration timed out. Please use /join again to retry.');
+        return;
+      }
+
+      const parts = message.content.split('|').map(p => p.trim());
+      const inGameName = parts[0];
+      const inGameId = parts[1];
+      const inGameDetails = parts.slice(2).join(' | ') || 'solo player';
+
+      if (!inGameName || !inGameId) {
+        await message.reply(
+          'Incorrect format. Please reply with:\n\n' +
+          'IGN | Player ID | Group Details\n\n' +
+          'Example: Lavkush | #ABC123 | solo'
+        );
+        return;
+      }
+
+      try {
+        const guild = await client.guilds.fetch(GUILD_ID);
+        await guild.members.fetch();
+
+        const member = guild.members.cache.get(userId);
+
+        if (!member) {
+          await message.reply('Could not find you in the server. Make sure you are still in the server and try again.');
+          delete pendingFreeRegistrations[userId];
+          return;
+        }
+
+        delete pendingFreeRegistrations[userId];
+        await assignRole(member, pending.slot, inGameName, inGameId, inGameDetails, null);
+        await message.reply('Registration complete! Check the server — your lobby channel is now visible.');
+
+      } catch (err) {
+        console.log('Error in free registration: ' + err.message);
+        await message.reply('Something went wrong. Please DM an admin for help.');
+      }
+
+      return;
+    }
+  }
 
   const member = message.member;
   if (!member) return;
@@ -363,38 +466,35 @@ client.on('messageCreate', async (message) => {
   if (!isAdmin) return;
 
   if (message.content === '!resetslots') {
-    slotCounts['4pm'] = 8;
-    slotCounts['6pm'] = 8;
-    slotCounts['mc-free'] = 16;
-    slotCounts['coc-war'] = 20;
-    slotCounts['coc-tournament'] = 20;
-
-    Object.keys(slotCounterMessageIds).forEach(key => {
+    Object.keys(slotCounts).forEach(key => {
+      const defaults = {
+        'ml-a': 8, 'ml-b': 8, 'ml-free': 20,
+        'cr-a': 8, 'cr-b': 8, 'cr-free': 16,
+        'mc-a': 8, 'mc-b': 8, 'mc-free': 16,
+        'coc-war': 40, 'coc-free': 128,
+      };
+      slotCounts[key] = defaults[key];
       slotCounterMessageIds[key] = null;
     });
-
     await message.reply('All slot counts reset successfully.');
   }
 
   if (message.content.startsWith('!resetslot ')) {
     const slot = message.content.split(' ')[1];
-    const defaultCounts = {
-      '4pm': 8,
-      '6pm': 8,
-      'mc-free': 16,
-      'coc-war': 20,
-      'coc-tournament': 20,
+    const defaults = {
+      'ml-a': 8, 'ml-b': 8, 'ml-free': 20,
+      'cr-a': 8, 'cr-b': 8, 'cr-free': 16,
+      'mc-a': 8, 'mc-b': 8, 'mc-free': 16,
+      'coc-war': 40, 'coc-free': 128,
     };
 
-    if (!defaultCounts[slot]) {
-      return message.reply(
-        'Unknown slot. Use: 4pm 6pm mc-free coc-war coc-tournament'
-      );
+    if (!defaults[slot]) {
+      return message.reply('Unknown slot. Valid slots: ml-a ml-b ml-free cr-a cr-b cr-free mc-a mc-b mc-free coc-war coc-free');
     }
 
-    slotCounts[slot] = defaultCounts[slot];
+    slotCounts[slot] = defaults[slot];
     slotCounterMessageIds[slot] = null;
-    await message.reply('Slot ' + slot + ' reset to ' + defaultCounts[slot] + ' successfully.');
+    await message.reply('Slot ' + slot + ' reset to ' + defaults[slot] + ' successfully.');
   }
 });
 
