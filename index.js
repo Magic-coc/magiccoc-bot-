@@ -64,17 +64,17 @@ const PAID_LINKS = {
 };
 
 const slotCounts = {
-  'ml-a': 8,
-  'ml-b': 8,
-  'ml-free': 20,
-  'cr-a': 8,
-  'cr-b': 8,
-  'cr-free': 16,
-  'mc-a': 8,
-  'mc-b': 8,
-  'mc-free': 16,
-  'coc-war': 40,
-  'coc-free': 128,
+  'ml-a': 20,
+  'ml-b': 20,
+  'ml-free': 40,
+  'cr-a': 10,
+  'cr-b': 10,
+  'cr-free': 20,
+  'mc-a': 32,
+  'mc-b': 32,
+  'mc-free': 64,
+  'coc-war': 20,
+  'coc-free': 80,
 };
 
 const slotCounterMessageIds = {};
@@ -468,10 +468,10 @@ client.on('messageCreate', async (message) => {
   if (message.content === '!resetslots') {
     Object.keys(slotCounts).forEach(key => {
       const defaults = {
-        'ml-a': 8, 'ml-b': 8, 'ml-free': 20,
-        'cr-a': 8, 'cr-b': 8, 'cr-free': 16,
-        'mc-a': 8, 'mc-b': 8, 'mc-free': 16,
-        'coc-war': 40, 'coc-free': 128,
+        'ml-a': 20, 'ml-b': 20, 'ml-free': 40,
+        'cr-a': 10, 'cr-b': 10, 'cr-free': 20,
+        'mc-a': 32, 'mc-b': 32, 'mc-free': 64,
+        'coc-war': 20, 'coc-free': 80,
       };
       slotCounts[key] = defaults[key];
       slotCounterMessageIds[key] = null;
@@ -482,10 +482,10 @@ client.on('messageCreate', async (message) => {
   if (message.content.startsWith('!resetslot ')) {
     const slot = message.content.split(' ')[1];
     const defaults = {
-      'ml-a': 8, 'ml-b': 8, 'ml-free': 20,
-      'cr-a': 8, 'cr-b': 8, 'cr-free': 16,
-      'mc-a': 8, 'mc-b': 8, 'mc-free': 16,
-      'coc-war': 40, 'coc-free': 128,
+      'ml-a': 20, 'ml-b': 20, 'ml-free': 40,
+      'cr-a': 10, 'cr-b': 10, 'cr-free': 20,
+      'mc-a': 32, 'mc-b': 32, 'mc-free': 64,
+      'coc-war': 20, 'coc-free': 80,
     };
 
     if (!defaults[slot]) {
