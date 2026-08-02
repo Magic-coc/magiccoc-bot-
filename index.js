@@ -64,17 +64,31 @@ const PAID_LINKS = {
 };
 
 const slotCounts = {
-  'ml-a': 20,
-  'ml-b': 20,
-  'ml-free': 40,
-  'cr-a': 10,
-  'cr-b': 10,
-  'cr-free': 20,
-  'mc-a': 32,
-  'mc-b': 32,
-  'mc-free': 64,
-  'coc-war': 20,
-  'coc-free': 80,
+  'ml-a': 8,
+  'ml-b': 8,
+  'ml-free': 20,
+  'cr-a': 8,
+  'cr-b': 8,
+  'cr-free': 16,
+  'mc-a': 8,
+  'mc-b': 8,
+  'mc-free': 16,
+  'coc-war': 40,
+  'coc-free': 128,
+};
+
+const activeSlots = {
+  'ml-a': false,
+  'ml-b': false,
+  'ml-free': false,
+  'cr-a': false,
+  'cr-b': false,
+  'cr-free': false,
+  'mc-a': false,
+  'mc-b': false,
+  'mc-free': false,
+  'coc-war': false,
+  'coc-free': false,
 };
 
 const slotCounterMessageIds = {};
@@ -239,6 +253,10 @@ async function assignRole(member, slot, inGameName, inGameId, inGameDetails, amo
       slotCounts[slot]--;
     }
 
+    if (slotCounts[slot] === 0) {
+      activeSlots[slot] = false;
+    }
+
     await updateOrCreateSlotCounter(slot);
 
     await member.send(
@@ -338,9 +356,18 @@ client.on('interactionCreate', async (interaction) => {
     const label = SLOT_LABELS[slot];
     const isFree = FREE_SLOTS.includes(slot);
 
+    if (!activeSlots[slot]) {
+      return interaction.reply({
+        content:
+          label + ' is not available at the moment.\n' +
+          'Watch #announcements for when the next match or contest opens.',
+        ephemeral: true,
+      });
+    }
+
     if (slotCounts[slot] <= 0) {
       return interaction.reply({
-        content: label + ' is full. No slots remaining. Watch announcements for next match.',
+        content: label + ' is full. No slots remaining. Watch #announcements for next match.',
         ephemeral: true,
       });
     }
@@ -382,7 +409,7 @@ client.on('interactionCreate', async (interaction) => {
 
       if (!link || link === 'placeholder') {
         return interaction.reply({
-          content: label + ' registration is not open yet. Watch announcements for updates.',
+          content: label + ' registration is not open yet. Watch #announcements for updates.',
           ephemeral: true,
         });
       }
@@ -465,14 +492,44 @@ client.on('messageCreate', async (message) => {
   const isAdmin = member.roles.cache.some(r => r.name === 'Admin');
   if (!isAdmin) return;
 
+  const validSlots = Object.keys(activeSlots);
+
+  if (message.content.startsWith('!open ')) {
+    const slot = message.content.split(' ')[1];
+    if (!validSlots.includes(slot)) {
+      return message.reply('Unknown slot. Valid slots: ' + validSlots.join(', '));
+    }
+    activeSlots[slot] = true;
+    await updateOrCreateSlotCounter(slot);
+    await message.reply(SLOT_LABELS[slot] + ' is now OPEN. Players can register using /join.');
+    await logToChannel('Slot opened by admin: ' + SLOT_LABELS[slot]);
+  }
+
+  if (message.content.startsWith('!close ')) {
+    const slot = message.content.split(' ')[1];
+    if (!validSlots.includes(slot)) {
+      return message.reply('Unknown slot. Valid slots: ' + validSlots.join(', '));
+    }
+    activeSlots[slot] = false;
+    await message.reply(SLOT_LABELS[slot] + ' is now CLOSED. Players can no longer register.');
+    await logToChannel('Slot closed by admin: ' + SLOT_LABELS[slot]);
+  }
+
+  if (message.content === '!status') {
+    const statusList = validSlots.map(slot =>
+      SLOT_LABELS[slot] + ': ' + (activeSlots[slot] ? 'OPEN (' + slotCounts[slot] + ' slots left)' : 'CLOSED')
+    ).join('\n');
+    await message.reply('Current slot status:\n\n' + statusList);
+  }
+
   if (message.content === '!resetslots') {
+    const defaults = {
+      'ml-a': 8, 'ml-b': 8, 'ml-free': 20,
+      'cr-a': 8, 'cr-b': 8, 'cr-free': 16,
+      'mc-a': 8, 'mc-b': 8, 'mc-free': 16,
+      'coc-war': 40, 'coc-free': 128,
+    };
     Object.keys(slotCounts).forEach(key => {
-      const defaults = {
-        'ml-a': 20, 'ml-b': 20, 'ml-free': 40,
-        'cr-a': 10, 'cr-b': 10, 'cr-free': 20,
-        'mc-a': 32, 'mc-b': 32, 'mc-free': 64,
-        'coc-war': 20, 'coc-free': 80,
-      };
       slotCounts[key] = defaults[key];
       slotCounterMessageIds[key] = null;
     });
@@ -482,16 +539,14 @@ client.on('messageCreate', async (message) => {
   if (message.content.startsWith('!resetslot ')) {
     const slot = message.content.split(' ')[1];
     const defaults = {
-      'ml-a': 20, 'ml-b': 20, 'ml-free': 40,
-      'cr-a': 10, 'cr-b': 10, 'cr-free': 20,
-      'mc-a': 32, 'mc-b': 32, 'mc-free': 64,
-      'coc-war': 20, 'coc-free': 80,
+      'ml-a': 8, 'ml-b': 8, 'ml-free': 20,
+      'cr-a': 8, 'cr-b': 8, 'cr-free': 16,
+      'mc-a': 8, 'mc-b': 8, 'mc-free': 16,
+      'coc-war': 40, 'coc-free': 128,
     };
-
     if (!defaults[slot]) {
-      return message.reply('Unknown slot. Valid slots: ml-a ml-b ml-free cr-a cr-b cr-free mc-a mc-b mc-free coc-war coc-free');
+      return message.reply('Unknown slot. Valid slots: ' + validSlots.join(', '));
     }
-
     slotCounts[slot] = defaults[slot];
     slotCounterMessageIds[slot] = null;
     await message.reply('Slot ' + slot + ' reset to ' + defaults[slot] + ' successfully.');
